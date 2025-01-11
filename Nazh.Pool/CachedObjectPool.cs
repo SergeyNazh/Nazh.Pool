@@ -14,9 +14,10 @@ namespace Nazh.Pool
 
         public override T Get()
         {
-            while (_pool.Count > 0)
+            while (_pool.TryDequeue(out WeakReference<T> reference))
             {
-                if (!_pool.TryDequeue(out WeakReference<T> reference) || !reference.TryGetTarget(out T obj))
+                Interlocked.Decrement(ref _count);
+                if (!reference.TryGetTarget(out T obj))
                 {
                     continue;
                 }
@@ -42,8 +43,13 @@ namespace Nazh.Pool
                 return false;
             }
             WeakReference<T> reference = new WeakReference<T>(obj);
-            _pool.Enqueue(reference);
-            return true;
+            if (Interlocked.Increment(ref _count) <= _capacity)
+            {
+                _pool.Enqueue(reference);
+                return true;
+            }
+            Interlocked.Decrement(ref _count);
+            return false;
         }
     }
 }
