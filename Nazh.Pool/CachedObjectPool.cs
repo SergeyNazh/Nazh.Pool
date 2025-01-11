@@ -7,7 +7,7 @@ namespace Nazh.Pool
     {
         private ConcurrentQueue<WeakReference<T>> _pool;
         public CachedObjectPool() : this(new DefaultPooledObjectStrategy<T>()) { }
-        public CachedObjectPool(PooledObjectStrategy<T> pooledObjectStrategy) : base(pooledObjectStrategy)
+        public CachedObjectPool(PooledObjectStrategy<T> pooledObjectStrategy, int capacity = int.MaxValue) : base(pooledObjectStrategy, capacity)
         {
             _pool = new ConcurrentQueue<WeakReference<T>>();
         }
@@ -23,6 +23,16 @@ namespace Nazh.Pool
                 return obj;
             }
             return PooledObjectStrategy.Create();
+        }
+
+        public override void Resize(int capacity)
+        {
+            Interlocked.Exchange(ref _capacity, capacity);
+            while (_count > _capacity)
+            {
+                _pool.TryDequeue(out _);
+                Interlocked.Decrement(ref _count);
+            }
         }
 
         public override bool Return(T obj)
